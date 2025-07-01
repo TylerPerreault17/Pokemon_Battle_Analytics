@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Pokemon Download Reader 
 """
 ### pip install beautifulsoup4
 ### pip install lxml
 
-
-count = 5
+link = "Gen9NatDexDraft-2025-06-29-sword1101-umbrebro.html"
+count = 4
 pku = 0 
 pko = 0 
 pdofmon =  ["recoil", "sandstorm", "burn", "poison", "Flame Orb", 
@@ -15,7 +14,7 @@ pdofmon =  ["recoil", "sandstorm", "burn", "poison", "Flame Orb",
             "Bind", "Whirlpool", "Wrap", "Sand Tomb", "Fire Spin",  
             "tormented", "liquid ooze", "lost some of its HP", 
             "afflicted by the curse", "perish count fell to 0",
-            "Infestation", "hail"]
+            "Infestation", "hail", "Salt Cure"]
 pdofomon = ["Aftermath", "Dry Skin", "Gulp Missile", "Iron Barbs",
             "Rough Skin", "Solar Power", "Explosion", "Memento", 
             "Self-Destruct", "Lunar Dance"] 
@@ -37,14 +36,14 @@ def death(m, pko, pku):
             o = True
         else:
             o = False
-        ##print(f"{nickname} died")
+        #print(f"{nickname} died")
         
-        if pko >= 0:
+        if pko >= 0 and o == True:
             ##print("passive kill of opponent")
             kill_info.loc[mon_user,"pko"] += 1
             kill_info.loc[mon_opp,"pdeath"] += 1
         
-        elif pku >= 0:
+        elif pku >= 0 and o == False:
             ##print("passive kill of user")
             kill_info.loc[mon_user,"pdeath"] += 1
             kill_info.loc[mon_opp,"pko"] += 1
@@ -65,6 +64,9 @@ def active_mon(m):
     global mon_user
     global kill_info
     
+    team_u = kill_info.head(6)
+    team_o = kill_info.tail(6)
+    
     if "(" in m:
         if "sent out " in m:
             m1 = m.split(" sent out ")
@@ -73,17 +75,45 @@ def active_mon(m):
             m3 = m2[1].split(")!")
             mon = m3[0]
             ##print(f"---------{mon} - {nickname}")
-            mon_opp = mon
-            kill_info.loc[mon,"nick"] = nickname
+            
+            if( nickname not in kill_info["nick"].values):
+                kill_info.loc[mon,"nick"] = nickname
+                mon_opp = mon
+            else:
+                mon_opp = kill_info[kill_info["nick"]==nickname].index
+            
         if "Go! " in m:
             m1 = m.split("Go! ")
             m2 = m1[1].split(" (")
             nickname = m2[0]
             m3 = m2[1].split(")!")
             mon = m3[0]
-            ##print(f"---------{mon} - {nickname}")
-            mon_user = mon
-            kill_info.loc[mon,"nick"] = nickname
+            #print(f"---------{mon} - {nickname}")
+            
+            if( nickname not in kill_info["nick"].values):
+                kill_info.loc[mon,"nick"] = nickname
+                mon_user = mon
+            else:
+                mon_user = kill_info[kill_info["nick"]==nickname].index
+       
+        if "dragged out" in m:
+            m1 = m.split(" was dragged out!")
+            m2 = m1[0].split(" (")
+            nickname = m2[0]
+            m3 = m2[1].split(")")
+            mon = m3[0]
+            if nickname in team_u.values:
+                mon_user = kill_info[kill_info["nick"]==nickname].index
+            else:
+                if nickname in team_o.values:
+                    mon_opp = kill_info[kill_info["nick"]==nickname].index
+                elif mon in team_u.index:
+                    kill_info.loc[mon,"nick"] = nickname
+                    mon_user = mon
+                else:
+                    mon_opp = mon
+                    kill_info.loc[mon,"nick"] = nickname
+            
             
     elif "!" in m:
         if "sent out " in m:
@@ -92,16 +122,39 @@ def active_mon(m):
             mon = m2[0]
             nickname = mon
             ##print(f"---------{mon} - {nickname}")
-            mon_opp = mon
-            kill_info.loc[mon,"nick"] = nickname
+            
+            if( nickname not in kill_info["nick"].values):
+                kill_info.loc[mon,"nick"] = nickname
+                mon_opp = mon
+            else:
+                mon_opp = kill_info[kill_info["nick"]==nickname].index
+        if "dragged out" in m:
+            m1 = m.split(" was dragged out!")
+            mon = m1[0]
+            nickname = mon
+            ##print(f"---------{mon} - {nickname}")
+            
+            if( nickname not in  kill_info["nick"].values):
+                kill_info.loc[mon,"nick"] = nickname
+            
+                if(mon in team_u.index):
+                    mon_user = mon
+                if(mon in team_o.index):
+                    mon_opp = mon
+            
         if "Go! " in m:
             m1 = m.split("Go! ")
             m2 = m1[1].split("!")
             mon = m2[0]
             nickname = mon
             ##print(f"---------{mon} - {nickname}")
-            mon_user = mon
-            kill_info.loc[mon,"nick"] = nickname
+            
+            if( nickname not in kill_info["nick"].values):
+                kill_info.loc[mon,"nick"] = nickname
+                mon_user = mon
+            else:
+                mon_user = kill_info[kill_info["nick"]==nickname].index
+                
     
 """ Passive kill potential countdoun"""
 def passive_kill(m, pko, pku):
@@ -139,9 +192,9 @@ def passive_kill(m, pko, pku):
     
     elif("took its attacker down with it") in m:
         if "The opposing" in m:
-            pko = count
-        else:
             pku = count
+        else:
+            pko = count
 
     return pko, pku
 
@@ -151,7 +204,7 @@ def passive_kill(m, pko, pku):
 
 """Main"""
 
-filename = open("Gen9NatDexDraft-2025-05-22-poopoluealt-sword1101.html","r") ## read only file
+filename = open(link,"r") ## read only file
 
 content1 = filename.read() ## html file to readable text form
 ##print(content) ##prints full html code, not cleaned
@@ -220,4 +273,5 @@ elif(opp_death_sum > 5):
     print("Opponent lost")
 else:
     print("Game incomplete")
+
 
